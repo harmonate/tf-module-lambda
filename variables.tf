@@ -26,11 +26,6 @@ variable "runtime" {
   default     = "python3.8"
 }
 
-variable "source_path" {
-  description = "The path to the source code for the Lambda function"
-  type        = string
-}
-
 variable "environment_variables" {
   description = "Environment variables for the Lambda function"
   type        = map(string)
@@ -79,4 +74,19 @@ variable "iam_policies" {
     policy = string
   }))
   default = []
+}
+
+variable "source_dir" {
+  description = "The directory containing the Lambda function source code"
+  type        = string
+}
+
+variable "requirements_file" {
+  description = "The path to the requirements.txt file"
+  type        = string
+}
+
+variable "handler_filename" {
+  description = "The filename of the Lambda handler"
+  type        = string
 }

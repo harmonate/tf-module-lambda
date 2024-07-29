@@ -5,12 +5,14 @@
 module "lambda_function" {
   source = "git::https://github.com/harmonate/tf-module-lambda.git?ref=main"
 
-  project_name          = "common_project"
-  region                = "us-west-2"
-  function_name         = "my-lambda-function"
-  handler               = "lambda.handler"
-  runtime               = "python3.8"
-  source_path           = "lambda/my-lambda-function"
+  project_name            = "common_project"
+  region                  = "us-west-2"
+  function_name           = "my-lambda-function"
+  handler                 = "lambda.handler"
+  runtime                 = "python3.8"
+  source_dir              = "lambda/my-lambda-function"
+  requirements_filename   = "requirements.txt"
+  handler_filename        = "lambda_function.py"
   environment_variables = {
     VAR1 = "value1"
     VAR2 = "value2"
