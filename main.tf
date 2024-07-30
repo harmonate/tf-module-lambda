@@ -58,18 +58,24 @@ locals {
 
 resource "null_resource" "install_dependencies" {
   triggers = {
-    dependencies_versions = filemd5(local.is_python ? var.requirements_file : "${var.source_dir}/package.json")
-    source_versions       = filemd5("${var.source_dir}/${var.handler_filename}")
+    dependencies_versions = local.is_python ? (
+      var.requirements_file != null ? filemd5(var.requirements_file) : ""
+      ) : (
+      filemd5("${var.source_dir}/package.json")
+    )
+    source_versions = filemd5("${var.source_dir}/${var.handler}")
   }
 
   provisioner "local-exec" {
     command = local.is_python ? (
-      <<EOT
-        mkdir -p ${var.source_dir}/package
-        pip install -r ${var.requirements_file} -t ${var.source_dir}/package
-        cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
-      EOT
-    ) : local.is_nodejs ? (
+      var.requirements_file != null ? (
+        <<EOT
+          mkdir -p ${var.source_dir}/package
+          pip install -r ${var.requirements_file} -t ${var.source_dir}/package
+          cp ${var.source_dir}/${var.handler} ${var.source_dir}/package/
+        EOT
+      ) : "echo 'No requirements file specified for Python runtime'"
+      ) : local.is_nodejs ? (
       <<EOT
         cd ${var.source_dir}
         ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}

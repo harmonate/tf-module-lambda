@@ -17,7 +17,7 @@ variable "function_name" {
 variable "handler" {
   description = "The handler for the Lambda function"
   type        = string
-  default     = "index.handler"
+  default     = null
 }
 
 variable "environment_variables" {
@@ -72,11 +72,7 @@ variable "source_dir" {
 variable "requirements_file" {
   description = "The path to the requirements.txt file"
   type        = string
-}
-
-variable "handler_filename" {
-  description = "The filename of the Lambda handler"
-  type        = string
+  default     = null
 }
 
 variable "temp_s3_bucket_prefix" {
