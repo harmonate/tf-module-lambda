@@ -44,12 +44,6 @@ variable "memory_size" {
   default     = 128
 }
 
-variable "additional_iam_policies" {
-  description = "List of additional IAM policy ARNs to attach to the instance role"
-  type        = list(string)
-  default     = []
-}
-
 variable "iam_role_name" {
   description = "Name of the IAM role to create"
   type        = string
@@ -89,4 +83,10 @@ variable "requirements_file" {
 variable "handler_filename" {
   description = "The filename of the Lambda handler"
   type        = string
+}
+
+variable "temp_s3_bucket_prefix" {
+  description = "Prefix for the temporary S3 bucket name"
+  type        = string
+  default     = "temp-lambda-code"
 }

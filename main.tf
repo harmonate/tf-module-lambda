@@ -1,8 +1,20 @@
 resource "random_string" "suffix" {
-  length  = 5
+  length  = 8
   special = false
   upper   = false
   numeric = true
+}
+
+resource "aws_s3_bucket" "temp_lambda_code" {
+  bucket        = "${var.temp_s3_bucket_prefix}-${var.function_name}-${random_string.suffix.result}"
+  force_destroy = true
+}
+
+resource "aws_s3_object" "lambda_code" {
+  bucket = aws_s3_bucket.temp_lambda_code.id
+  key    = "${var.function_name}.zip"
+  source = data.archive_file.lambda_zip.output_path
+  etag   = filemd5(data.archive_file.lambda_zip.output_path)
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
@@ -26,9 +38,8 @@ resource "aws_iam_role_policy_attachment" "arn_policies" {
 data "archive_file" "lambda_zip" {
   type        = "zip"
   output_path = "${path.module}/lambda-${random_string.suffix.result}.zip"
-  source_dir  = var.source_dir
-
-  depends_on = [null_resource.install_dependencies]
+  source_dir  = "${var.source_dir}/package"
+  depends_on  = [null_resource.install_dependencies]
 }
 
 resource "null_resource" "install_dependencies" {
@@ -46,7 +57,6 @@ resource "null_resource" "install_dependencies" {
   }
 }
 
-
 resource "aws_lambda_function" "this" {
   function_name    = var.function_name
   handler          = var.handler
@@ -61,4 +71,19 @@ resource "aws_lambda_function" "this" {
 
   timeout     = var.timeout
   memory_size = var.memory_size
+}
+
+resource "null_resource" "delete_temp_bucket" {
+  triggers = {
+    lambda_arn = aws_lambda_function.this.arn
+  }
+
+  provisioner "local-exec" {
+    command = <<EOF
+      aws s3 rm s3://${aws_s3_bucket.temp_lambda_code.id} --recursive
+      aws s3api delete-bucket --bucket ${aws_s3_bucket.temp_lambda_code.id}
+    EOF
+  }
+
+  depends_on = [aws_lambda_function.this]
 }
