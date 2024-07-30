@@ -11,6 +11,14 @@ resource "aws_s3_bucket" "temp_lambda_code" {
   force_destroy = true
 }
 
+resource "aws_s3_object" "lambda_code" {
+  count  = local.is_image ? 0 : 1
+  bucket = aws_s3_bucket.temp_lambda_code[0].id
+  key    = "${var.function_name}.zip"
+  source = data.archive_file.lambda_zip[0].output_path
+  etag   = data.archive_file.lambda_zip[0].output_base64sha256
+}
+
 resource "aws_iam_role" "lambda_execution_role" {
   name               = var.iam_role_name
   assume_role_policy = var.assume_role_policy
@@ -56,7 +64,7 @@ resource "null_resource" "install_dependencies" {
   triggers = {
     dependencies_versions = local.is_python ? (
       var.requirements_file != null ? filemd5(var.requirements_file) : ""
-      ) : local.is_nodejs ? (
+    ) : local.is_nodejs ? (
       filemd5("${var.source_dir}/package.json")
     ) : ""
     source_versions = local.is_python || local.is_nodejs ? filemd5("${var.source_dir}/${var.handler_filename}") : ""
@@ -71,7 +79,7 @@ resource "null_resource" "install_dependencies" {
           cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
         EOT
       ) : "echo 'No requirements file specified for Python runtime'"
-      ) : local.is_nodejs ? (
+    ) : local.is_nodejs ? (
       <<EOT
         cd ${var.source_dir}
         ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}
@@ -88,14 +96,6 @@ data "archive_file" "lambda_zip" {
   excludes    = local.is_nodejs ? ["node_modules"] : []
 
   depends_on = [null_resource.install_dependencies]
-}
-
-resource "aws_s3_object" "lambda_code" {
-  count  = local.is_image ? 0 : 1
-  bucket = aws_s3_bucket.temp_lambda_code[0].id
-  key    = "${var.function_name}.zip"
-  source = data.archive_file.lambda_zip[0].output_path
-  etag   = data.archive_file.lambda_zip[0].output_base64sha256
 }
 
 resource "aws_lambda_function" "this" {
@@ -118,12 +118,12 @@ resource "aws_lambda_function" "this" {
     }
   }
 
-  package_type = var.package_type
-  image_uri    = local.is_image ? var.image_uri : null
-  s3_bucket    = local.is_image ? null : aws_s3_bucket.temp_lambda_code[0].id
-  s3_key       = local.is_image ? null : aws_s3_object.lambda_code[0].key
-  handler      = local.is_image ? null : var.handler
-  runtime      = local.is_image ? null : var.runtime
+  package_type  = var.package_type
+  image_uri     = local.is_image ? var.image_uri : null
+  s3_bucket     = local.is_image ? null : aws_s3_bucket.temp_lambda_code[0].id
+  s3_key        = local.is_image ? null : aws_s3_object.lambda_code[0].key
+  handler       = local.is_image ? null : var.handler
+  runtime       = local.is_image ? null : var.runtime
 
   timeout     = var.timeout
   memory_size = var.memory_size
