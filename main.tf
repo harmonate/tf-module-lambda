@@ -15,10 +15,10 @@ resource "aws_s3_object" "lambda_code" {
   count  = local.is_image ? 0 : 1
   bucket = aws_s3_bucket.lambda_bucket[0].id
   key    = local.filename
-  source = local.filename
-  etag   = filemd5(local.filename)
+  source = local_file.lambda_zip[0].filename
+  etag   = filemd5(local_file.lambda_zip[0].filename)
 
-  depends_on = [null_resource.install_dependencies]
+  depends_on = [local_file.lambda_zip]
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
@@ -38,7 +38,6 @@ resource "aws_iam_role_policy_attachment" "arn_policies" {
   policy_arn = var.iam_policy_arns[count.index]
   role       = aws_iam_role.lambda_execution_role.name
 }
-
 
 resource "null_resource" "delete_temp_bucket" {
   triggers = {
@@ -62,7 +61,7 @@ locals {
   filename  = "${var.function_name}.zip"
 }
 
-resource "null_resource" "install_dependencies" {
+resource "null_resource" "install_dependencies_and_zip" {
   count = local.is_image ? 0 : 1
   triggers = {
     dependencies_versions = local.is_python ? (
@@ -92,6 +91,14 @@ resource "null_resource" "install_dependencies" {
       EOT
     ) : "echo 'Skipping dependency installation for Image-based Lambda'"
   }
+}
+
+resource "local_file" "lambda_zip" {
+  count    = local.is_image ? 0 : 1
+  filename = local.filename
+  content  = "placeholder"
+
+  depends_on = [null_resource.install_dependencies_and_zip]
 }
 
 resource "aws_lambda_function" "this" {

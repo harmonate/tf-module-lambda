@@ -6,15 +6,12 @@ terraform {
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.0"
+      version = "~> 3.1"
     }
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 3.0"
-    }
-    archive = {
-      source  = "hashicorp/archive"
-      version = "2.4.2"
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.1"
     }
   }
+  required_version = ">= 0.13"
 }
