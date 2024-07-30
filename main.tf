@@ -11,16 +11,6 @@ resource "aws_s3_bucket" "lambda_bucket" {
   force_destroy = true
 }
 
-resource "aws_s3_object" "lambda_code" {
-  count  = local.is_image ? 0 : 1
-  bucket = aws_s3_bucket.lambda_bucket[0].id
-  key    = local.filename
-  source = local.filename
-  etag   = md5(timestamp())
-
-  depends_on = [null_resource.install_dependencies_and_zip]
-}
-
 resource "aws_iam_role" "lambda_execution_role" {
   name               = var.iam_role_name
   assume_role_policy = var.assume_role_policy
@@ -59,17 +49,17 @@ locals {
   is_nodejs = substr(var.runtime, 0, 6) == "nodejs"
   is_image  = var.package_type == "Image"
   filename  = "${var.function_name}.zip"
+  source_hash = local.is_image ? "" : (
+    local.is_python ?
+    base64sha256(join("", [for f in fileset(var.source_dir, "**") : filebase64sha256("${var.source_dir}/${f}")])) :
+    base64sha256(join("", [for f in fileset(var.source_dir, "**") : filebase64sha256("${var.source_dir}/${f}")]))
+  )
 }
 
 resource "null_resource" "install_dependencies_and_zip" {
   count = local.is_image ? 0 : 1
   triggers = {
-    dependencies_versions = local.is_python ? (
-      var.requirements_file != null ? filemd5(var.requirements_file) : ""
-      ) : local.is_nodejs ? (
-      filemd5("${var.source_dir}/package.json")
-    ) : ""
-    source_versions = local.is_python || local.is_nodejs ? filemd5("${var.source_dir}/${var.handler_filename}") : ""
+    source_hash = local.source_hash
   }
 
   provisioner "local-exec" {
@@ -93,10 +83,12 @@ resource "null_resource" "install_dependencies_and_zip" {
   }
 }
 
-resource "local_file" "lambda_zip" {
-  count    = local.is_image ? 0 : 1
-  filename = local.filename
-  content  = "placeholder"
+resource "aws_s3_object" "lambda_code" {
+  count  = local.is_image ? 0 : 1
+  bucket = aws_s3_bucket.lambda_bucket[0].id
+  key    = local.filename
+  source = local.filename
+  etag   = local.source_hash
 
   depends_on = [null_resource.install_dependencies_and_zip]
 }
@@ -131,7 +123,7 @@ resource "aws_lambda_function" "this" {
   timeout     = var.timeout
   memory_size = var.memory_size
 
-  source_code_hash = local.is_image ? null : filebase64sha256(local.filename)
+  source_code_hash = local.is_image ? null : local.source_hash
 
   depends_on = [aws_s3_object.lambda_code]
 }
