@@ -15,10 +15,10 @@ resource "aws_s3_object" "lambda_code" {
   count  = local.is_image ? 0 : 1
   bucket = aws_s3_bucket.lambda_bucket[0].id
   key    = local.filename
-  source = local_file.lambda_zip[0].filename
-  etag   = filemd5(local_file.lambda_zip[0].filename)
+  source = local.filename
+  etag   = md5(timestamp())
 
-  depends_on = [local_file.lambda_zip]
+  depends_on = [null_resource.install_dependencies_and_zip]
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
@@ -130,6 +130,8 @@ resource "aws_lambda_function" "this" {
 
   timeout     = var.timeout
   memory_size = var.memory_size
+
+  source_code_hash = local.is_image ? null : filebase64sha256(local.filename)
 
   depends_on = [aws_s3_object.lambda_code]
 }
