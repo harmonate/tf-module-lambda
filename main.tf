@@ -5,19 +5,20 @@ resource "random_string" "suffix" {
   numeric = true
 }
 
-resource "aws_s3_bucket" "temp_lambda_code" {
+resource "aws_s3_bucket" "lambda_bucket" {
   count         = local.is_image ? 0 : 1
   bucket        = "lambda-${var.function_name}-${random_string.suffix.result}"
   force_destroy = true
 }
 
 resource "aws_s3_object" "lambda_code" {
-  count      = local.is_image ? 0 : 1
-  bucket     = aws_s3_bucket.temp_lambda_code[0].id
-  key        = "${var.function_name}.zip"
-  source     = data.archive_file.lambda_zip[0].output_path
-  etag       = data.archive_file.lambda_zip[0].output_base64sha256
-  depends_on = [data.archive_file.lambda_zip[0]]
+  count  = local.is_image ? 0 : 1
+  bucket = aws_s3_bucket.lambda_bucket[0].id
+  key    = local.filename
+  source = local.filename
+  etag   = filemd5(local.filename)
+
+  depends_on = [null_resource.install_dependencies]
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
@@ -46,8 +47,8 @@ resource "null_resource" "delete_temp_bucket" {
 
   provisioner "local-exec" {
     command = <<EOF
-      aws s3 rm s3://${aws_s3_bucket.temp_lambda_code[0].id} --recursive
-      aws s3api delete-bucket --bucket ${aws_s3_bucket.temp_lambda_code[0].id}
+      aws s3 rm s3://${aws_s3_bucket.lambda_bucket[0].id} --recursive
+      aws s3api delete-bucket --bucket ${aws_s3_bucket.lambda_bucket[0].id}
     EOF
   }
 
@@ -58,6 +59,7 @@ locals {
   is_python = substr(var.runtime, 0, 6) == "python"
   is_nodejs = substr(var.runtime, 0, 6) == "nodejs"
   is_image  = var.package_type == "Image"
+  filename  = "${var.function_name}.zip"
 }
 
 resource "null_resource" "install_dependencies" {
@@ -78,26 +80,29 @@ resource "null_resource" "install_dependencies" {
           mkdir -p ${var.source_dir}/package
           pip install -r ${var.requirements_file} -t ${var.source_dir}/package
           cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
+          cd ${var.source_dir}/package
+          zip -r ../../${local.filename} .
         EOT
       ) : "echo 'No requirements file specified for Python runtime'"
       ) : local.is_nodejs ? (
       <<EOT
         cd ${var.source_dir}
         ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}
+        zip -r ../${local.filename} .
       EOT
     ) : "echo 'Skipping dependency installation for Image-based Lambda'"
   }
 }
 
-data "archive_file" "lambda_zip" {
-  count       = local.is_image ? 0 : 1
-  type        = "zip"
-  output_path = "${path.module}/${var.function_name}.zip"
-  source_dir  = local.is_nodejs ? var.source_dir : "${var.source_dir}/package"
-  excludes    = local.is_nodejs ? ["node_modules"] : []
+# data "archive_file" "lambda_zip" {
+#   count       = local.is_image ? 0 : 1
+#   type        = "zip"
+#   output_path = "${path.module}/${var.function_name}.zip"
+#   source_dir  = local.is_nodejs ? var.source_dir : "${var.source_dir}/package"
+#   excludes    = local.is_nodejs ? ["node_modules"] : []
 
-  depends_on = [null_resource.install_dependencies]
-}
+#   depends_on = [null_resource.install_dependencies]
+# }
 
 resource "aws_lambda_function" "this" {
   function_name = var.function_name
@@ -121,7 +126,7 @@ resource "aws_lambda_function" "this" {
 
   package_type = var.package_type
   image_uri    = local.is_image ? var.image_uri : null
-  s3_bucket    = local.is_image ? null : aws_s3_bucket.temp_lambda_code[0].id
+  s3_bucket    = local.is_image ? null : aws_s3_bucket.lambda_bucket[0].id
   s3_key       = local.is_image ? null : aws_s3_object.lambda_code[0].key
   handler      = local.is_image ? null : var.handler
   runtime      = local.is_image ? null : var.runtime
@@ -131,3 +136,4 @@ resource "aws_lambda_function" "this" {
 
   depends_on = [aws_s3_object.lambda_code]
 }
+
