@@ -20,6 +20,12 @@ variable "handler" {
   default     = null
 }
 
+variable "handler_filename" {
+  description = "The filename of the handler function"
+  type        = string
+  default     = null
+}
+
 variable "environment_variables" {
   description = "Environment variables for the Lambda function"
   type        = map(string)
