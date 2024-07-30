@@ -29,20 +29,20 @@ resource "aws_iam_role_policy_attachment" "arn_policies" {
   role       = aws_iam_role.lambda_execution_role.name
 }
 
-resource "null_resource" "delete_temp_bucket" {
-  triggers = {
-    lambda_arn = aws_lambda_function.this.arn
-  }
+# resource "null_resource" "delete_temp_bucket" {
+#   triggers = {
+#     lambda_arn = aws_lambda_function.this.arn
+#   }
 
-  provisioner "local-exec" {
-    command = <<EOF
-      aws s3 rm s3://${aws_s3_bucket.lambda_bucket[0].id} --recursive
-      aws s3api delete-bucket --bucket ${aws_s3_bucket.lambda_bucket[0].id}
-    EOF
-  }
+#   provisioner "local-exec" {
+#     command = <<EOF
+#       aws s3 rm s3://${aws_s3_bucket.lambda_bucket[0].id} --recursive
+#       aws s3api delete-bucket --bucket ${aws_s3_bucket.lambda_bucket[0].id}
+#     EOF
+#   }
 
-  depends_on = [aws_lambda_function.this]
-}
+#   depends_on = [aws_lambda_function.this]
+# }
 
 locals {
   is_python = substr(var.runtime, 0, 6) == "python"
