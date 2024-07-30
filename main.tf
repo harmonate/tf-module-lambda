@@ -94,16 +94,6 @@ resource "null_resource" "install_dependencies" {
   }
 }
 
-# data "archive_file" "lambda_zip" {
-#   count       = local.is_image ? 0 : 1
-#   type        = "zip"
-#   output_path = "${path.module}/${var.function_name}.zip"
-#   source_dir  = local.is_nodejs ? var.source_dir : "${var.source_dir}/package"
-#   excludes    = local.is_nodejs ? ["node_modules"] : []
-
-#   depends_on = [null_resource.install_dependencies]
-# }
-
 resource "aws_lambda_function" "this" {
   function_name = var.function_name
   role          = aws_iam_role.lambda_execution_role.arn
