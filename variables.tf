@@ -90,3 +90,32 @@ variable "temp_s3_bucket_prefix" {
   type        = string
   default     = "temp-lambda-code"
 }
+
+variable "runtime" {
+  description = "The runtime for the Lambda function (python3.8, nodejs14.x, etc.)"
+  type        = string
+}
+
+variable "package_type" {
+  description = "The Lambda deployment package type. Valid values are Zip and Image."
+  type        = string
+  default     = "Zip"
+}
+
+variable "nodejs_package_manager" {
+  description = "The package manager to use for Node.js dependencies (npm or yarn)"
+  type        = string
+  default     = "npm"
+}
+
+variable "nodejs_package_manager_command" {
+  description = "The command to run the Node.js package manager"
+  type        = string
+  default     = "ci"
+}
+
+variable "image_uri" {
+  description = "The URI of the container image to use for the Lambda function"
+  type        = string
+  default     = null
+}

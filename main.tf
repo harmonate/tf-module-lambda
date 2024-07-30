@@ -35,48 +35,6 @@ resource "aws_iam_role_policy_attachment" "arn_policies" {
   role       = aws_iam_role.lambda_execution_role.name
 }
 
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  output_path = "${path.module}/lambda-${random_string.suffix.result}.zip"
-  source_dir  = var.source_dir
-  excludes    = ["package", "*.zip"]
-
-  depends_on = [null_resource.install_dependencies]
-}
-
-resource "null_resource" "install_dependencies" {
-  triggers = {
-    dependencies_versions = filemd5(var.requirements_file)
-    source_versions       = filemd5("${var.source_dir}/${var.handler_filename}")
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      mkdir -p ${var.source_dir}/package
-      pip install -r ${var.requirements_file} -t ${var.source_dir}/package
-      cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
-      cp -R ${var.source_dir}/package/* ${var.source_dir}/
-    EOT
-  }
-}
-
-resource "aws_lambda_function" "this" {
-  function_name    = var.function_name
-  handler          = var.handler
-  runtime          = var.runtime
-  role             = aws_iam_role.lambda_execution_role.arn
-  filename         = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-
-  environment {
-    variables = var.environment_variables
-  }
-
-  timeout     = var.timeout
-  memory_size = var.memory_size
-
-  depends_on = [null_resource.install_dependencies]
-}
 
 resource "null_resource" "delete_temp_bucket" {
   triggers = {
@@ -91,4 +49,60 @@ resource "null_resource" "delete_temp_bucket" {
   }
 
   depends_on = [aws_lambda_function.this]
+}
+
+locals {
+  is_python = substr(var.runtime, 0, 6) == "python"
+  is_nodejs = substr(var.runtime, 0, 6) == "nodejs"
+}
+
+resource "null_resource" "install_dependencies" {
+  triggers = {
+    dependencies_versions = filemd5(local.is_python ? var.requirements_file : "${var.source_dir}/package.json")
+    source_versions       = filemd5("${var.source_dir}/${var.handler_filename}")
+  }
+
+  provisioner "local-exec" {
+    command = local.is_python ? (
+      <<EOT
+        mkdir -p ${var.source_dir}/package
+        pip install -r ${var.requirements_file} -t ${var.source_dir}/package
+        cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
+      EOT
+    ) : local.is_nodejs ? (
+      <<EOT
+        cd ${var.source_dir}
+        ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}
+      EOT
+    ) : "echo 'Unsupported runtime'"
+  }
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  output_path = "${path.module}/lambda-${random_string.suffix.result}.zip"
+  source_dir  = local.is_nodejs ? var.source_dir : "${var.source_dir}/package"
+  excludes    = local.is_nodejs ? ["node_modules"] : []
+
+  depends_on = [null_resource.install_dependencies]
+}
+
+resource "aws_lambda_function" "this" {
+  function_name    = var.function_name
+  handler          = var.handler
+  runtime          = var.runtime
+  role             = aws_iam_role.lambda_execution_role.arn
+  filename         = var.package_type == "Zip" ? data.archive_file.lambda_zip.output_path : null
+  image_uri        = var.package_type == "Image" ? var.image_uri : null
+  source_code_hash = var.package_type == "Zip" ? data.archive_file.lambda_zip.output_base64sha256 : null
+  package_type     = var.package_type
+
+  environment {
+    variables = var.environment_variables
+  }
+
+  timeout     = var.timeout
+  memory_size = var.memory_size
+
+  depends_on = [null_resource.install_dependencies]
 }
