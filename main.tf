@@ -14,7 +14,7 @@ resource "aws_s3_object" "lambda_code" {
   bucket = aws_s3_bucket.temp_lambda_code.id
   key    = "${var.function_name}.zip"
   source = data.archive_file.lambda_zip.output_path
-  etag   = filemd5(data.archive_file.lambda_zip.output_path)
+  etag   = data.archive_file.lambda_zip.output_base64sha256
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
@@ -39,7 +39,25 @@ data "archive_file" "lambda_zip" {
   type        = "zip"
   output_path = "${path.module}/lambda-${random_string.suffix.result}.zip"
   source_dir  = var.source_dir
-  excludes    = ["package"]
+  excludes    = ["package", "*.zip"]
+
+  depends_on = [null_resource.install_dependencies]
+}
+
+resource "null_resource" "install_dependencies" {
+  triggers = {
+    dependencies_versions = filemd5(var.requirements_file)
+    source_versions       = filemd5("${var.source_dir}/${var.handler_filename}")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      mkdir -p ${var.source_dir}/package
+      pip install -r ${var.requirements_file} -t ${var.source_dir}/package
+      cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
+      cp -R ${var.source_dir}/package/* ${var.source_dir}/
+    EOT
+  }
 }
 
 resource "aws_lambda_function" "this" {
@@ -57,13 +75,7 @@ resource "aws_lambda_function" "this" {
   timeout     = var.timeout
   memory_size = var.memory_size
 
-  provisioner "local-exec" {
-    command = <<EOT
-      mkdir -p ${var.source_dir}/package
-      pip install -r ${var.requirements_file} -t ${var.source_dir}/package
-      cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
-    EOT
-  }
+  depends_on = [null_resource.install_dependencies]
 }
 
 resource "null_resource" "delete_temp_bucket" {
