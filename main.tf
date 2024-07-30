@@ -71,6 +71,10 @@ resource "null_resource" "install_dependencies_and_zip" {
           cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
           cd ${var.source_dir}/package
           zip -r ../../${local.filename} .
+          echo "Zip file size (bytes):" $(wc -c < ../../${local.filename})
+          if [ $(wc -c < ../../${local.filename}) -gt 250000000 ]; then
+            echo "Warning: Zip file size exceeds 250MB, which may cause issues with GitHub Actions."
+          fi
         EOT
       ) : "echo 'No requirements file specified for Python runtime'"
       ) : local.is_nodejs ? (
@@ -78,6 +82,10 @@ resource "null_resource" "install_dependencies_and_zip" {
         cd ${var.source_dir}
         ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}
         zip -r ../${local.filename} .
+        echo "Zip file size (bytes):" $(wc -c < ../${local.filename})
+        if [ $(wc -c < ../${local.filename}) -gt 250000000 ]; then
+          echo "Warning: Zip file size exceeds 250MB, which may cause issues with GitHub Actions."
+        fi
       EOT
     ) : "echo 'Skipping dependency installation for Image-based Lambda'"
   }
