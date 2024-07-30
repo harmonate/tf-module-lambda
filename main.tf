@@ -11,10 +11,11 @@ resource "aws_s3_bucket" "temp_lambda_code" {
 }
 
 resource "aws_s3_object" "lambda_code" {
-  bucket = aws_s3_bucket.temp_lambda_code.id
-  key    = "${var.function_name}.zip"
-  source = data.archive_file.lambda_zip.output_path
-  etag   = filemd5(data.archive_file.lambda_zip.output_path)
+  bucket     = aws_s3_bucket.temp_lambda_code.id
+  key        = "${var.function_name}.zip"
+  source     = data.archive_file.lambda_zip.output_path
+  etag       = filemd5(data.archive_file.lambda_zip.output_path)
+  depends_on = [data.archive_file.lambda_zip]
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
