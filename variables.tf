@@ -20,12 +20,6 @@ variable "handler" {
   default     = "index.handler"
 }
 
-variable "runtime" {
-  description = "The runtime for the Lambda function"
-  type        = string
-  default     = "python3.8"
-}
-
 variable "environment_variables" {
   description = "Environment variables for the Lambda function"
   type        = map(string)
