@@ -116,12 +116,6 @@ variable "image_uri" {
   default     = null
 }
 
-variable "package_type" {
-  description = "The Lambda deployment package type. Valid values are Zip and Image."
-  type        = string
-  default     = "Zip"
-}
-
 variable "image_config_command" {
   description = "The CMD for the docker image"
   type        = list(string)
