@@ -101,6 +101,12 @@ resource "aws_s3_object" "lambda_code" {
   depends_on = [null_resource.install_dependencies_and_zip]
 }
 
+resource "aws_cloudwatch_log_group" "lambda_log_group" {
+  name              = "/aws/lambda/${var.function_name}"
+  retention_in_days = var.cloudwatch_log_retention_in_days
+  tags              = var.tags
+}
+
 resource "aws_lambda_function" "this" {
   function_name = var.function_name
   role          = aws_iam_role.lambda_execution_role.arn
@@ -133,6 +139,8 @@ resource "aws_lambda_function" "this" {
 
   source_code_hash = local.is_image ? null : local.source_hash
 
-  depends_on = [aws_s3_object.lambda_code]
+  tags = var.tags
+
+  depends_on = [aws_s3_object.lambda_code, aws_cloudwatch_log_group.lambda_log_group]
 }
 

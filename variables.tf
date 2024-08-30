@@ -133,3 +133,15 @@ variable "image_config_working_directory" {
   type        = string
   default     = null
 }
+
+variable "cloudwatch_log_retention_in_days" {
+  description = "Specifies the number of days you want to retain log events in the Lambda function's log group"
+  type        = number
+  default     = 14
+}
+
+variable "tags" {
+  description = "A map of tags to add to all resources"
+  type        = map(string)
+  default     = {}
+}
