@@ -59,7 +59,7 @@ locals {
 resource "null_resource" "install_dependencies_and_zip" {
   count = local.is_image ? 0 : 1
   triggers = {
-    source_hash = local.source_hash
+    always_run = "${timestamp()}"  // This ensures the resource runs on every apply
   }
 
   provisioner "local-exec" {
@@ -77,7 +77,7 @@ resource "null_resource" "install_dependencies_and_zip" {
           fi
         EOT
       ) : "echo 'No requirements file specified for Python runtime'"
-      ) : local.is_nodejs ? (
+    ) : local.is_nodejs ? (
       <<EOT
         cd ${var.source_dir}
         ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}
@@ -96,7 +96,7 @@ resource "aws_s3_object" "lambda_code" {
   bucket = aws_s3_bucket.lambda_bucket[0].id
   key    = local.filename
   source = local.filename
-  etag   = local.source_hash
+  etag   = filemd5(local.filename)
 
   depends_on = [null_resource.install_dependencies_and_zip]
 }
