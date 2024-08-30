@@ -71,6 +71,7 @@ resource "null_resource" "install_dependencies_and_zip" {
           cp ${var.source_dir}/${var.handler_filename} ${var.source_dir}/package/
           cd ${var.source_dir}/package
           zip -r ../../${local.filename} .
+          md5sum ../../${local.filename} | cut -d ' ' -f 1 > ../../${local.filename}.md5
           echo "Zip file size (bytes):" $(wc -c < ../../${local.filename})
           if [ $(wc -c < ../../${local.filename}) -gt 250000000 ]; then
             echo "Warning: Zip file size exceeds 250MB, which may cause issues with GitHub Actions."
@@ -82,6 +83,7 @@ resource "null_resource" "install_dependencies_and_zip" {
         cd ${var.source_dir}
         ${var.nodejs_package_manager} ${var.nodejs_package_manager_command}
         zip -r ../${local.filename} .
+        md5sum ../${local.filename} | cut -d ' ' -f 1 > ../${local.filename}.md5
         echo "Zip file size (bytes):" $(wc -c < ../${local.filename})
         if [ $(wc -c < ../${local.filename}) -gt 250000000 ]; then
           echo "Warning: Zip file size exceeds 250MB, which may cause issues with GitHub Actions."
@@ -91,12 +93,18 @@ resource "null_resource" "install_dependencies_and_zip" {
   }
 }
 
+data "local_file" "lambda_zip_hash" {
+  count    = local.is_image ? 0 : 1
+  filename = "${local.filename}.md5"
+  depends_on = [null_resource.install_dependencies_and_zip]
+}
+
 resource "aws_s3_object" "lambda_code" {
   count  = local.is_image ? 0 : 1
   bucket = aws_s3_bucket.lambda_bucket[0].id
   key    = local.filename
   source = local.filename
-  etag   = filemd5(local.filename)
+  etag   = data.local_file.lambda_zip_hash[0].content
 
   depends_on = [null_resource.install_dependencies_and_zip]
 }
