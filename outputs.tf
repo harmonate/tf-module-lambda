@@ -13,7 +13,12 @@ output "lambda_function_invoke_arn" {
   value       = aws_lambda_function.this.invoke_arn
 }
 
-output "lambda_function_role" {
+output "lambda_function_role_arn" {
   description = "The ARN of the IAM role assigned to the Lambda function"
   value       = aws_iam_role.lambda_execution_role.arn
+}
+
+output "lambda_function_role_name" {
+  description = "The name of the CloudWatch Log Group for the Lambda function"
+  value       = aws_iam_role.lambda_execution_role.name
 }
